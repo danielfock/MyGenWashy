@@ -142,6 +142,9 @@ void setup() {
     Serial.println(integration.current().mode == INTEGRATION_MODE_ESPHOME_API ?
         F("ESPHome API Alternative") : F("MQTT"));
 
+    Serial.printf("Wasserstand-Modus: %d (%s)\n",
+        waterLevel.getMode(), waterLevel.getModeName());
+
     if (nano.readStatus()) {
         Serial.println(F("Nano Basis-Controller verbunden"));
     } else {
@@ -262,6 +265,8 @@ void setupWebserver() {
         doc["rpm"]           = ns.rpm;
         doc["water_low"]     = waterLevel.isLow();
         doc["water_high"]    = waterLevel.isHigh();
+        doc["water_mode"]    = waterLevel.getMode();
+        doc["water_mode_name"] = waterLevel.getModeName();
         doc["door_locked"]   = nano.isDoorLocked();
         doc["nano_ok"]       = nano.isConnected();
         doc["nano_error"]    = ns.error;
@@ -860,7 +865,6 @@ void _publishDiscovery(const char* component, const char* id, JsonDocument& doc)
     JsonObject dev = doc["dev"].to<JsonObject>();
     dev["ids"][0]  = "mygenwashy";
     dev["name"]    = "MyGenWashy";
-    dev["mf"]      = "MayerMakes / TuttleButtle";
     dev["mdl"]     = "MyGenWashy v2";
     dev["sw"]      = "2.0";
 

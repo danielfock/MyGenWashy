@@ -382,6 +382,19 @@ private:
         if (newState == WASH_PREWASH_WASH || newState == WASH_WASHING) {
             _resetWashMotion();
         }
+
+        // Water-Level-Modul ueber Fuell-/Abpump-Aktivitaet informieren
+        // (nur fuer Timer-Modus relevant, in anderen Modi No-Op)
+        bool filling  = (newState == WASH_PREWASH_FILL ||
+                         newState == WASH_FILLING ||
+                         newState == WASH_RINSE_FILL);
+        bool draining = (newState == WASH_PREWASH_DRAIN ||
+                         newState == WASH_DRAIN1 ||
+                         newState == WASH_RINSE_DRAIN ||
+                         newState == WASH_DRAIN2);
+        _water->notifyFilling(filling);
+        _water->notifyDraining(draining);
+
         Serial.println(getStateName());
     }
 

@@ -8,14 +8,35 @@ the team tested their theories on how safety mechanisms and machine parts worked
 At the end of day two the machine was running a cold wash programm from a dev kit and some homemade electronics controlled via ESP-home.
 On day three the learnings and circuits were converted into a kicad design for further testing and software development.
 
-The repository now contains:
+## Architecture
 
-- `3226TEST/` for the ATTiny3226 low-level controller
-- `NanoWashy/` for the Arduino Nano low-level controller
-- `ESP32Washy/` for the ESP32 high-level controller using the Arduino framework
-- `esphome/` as an earlier ESPHome-based reference
+The controller uses a two-MCU design with separation of concerns for safety:
 
-the board is intended to be locally produceable, by hand soldering and easy to repair. We avoided  "special" components for easy component substitution.
+**Base Controller (Arduino Nano / ATmega328P)** — low-level hardware control: TRIAC phase-angle motor control via zero-cross detection, RPM ramp up/down, relay command execution, NTC temperature monitoring, hardware watchdog. Contains no wash program logic.
+
+**Program Controller (ESP32)** — high-level logic: wash program state machine (fill → heat → wash → drain → rinse → spin → unlock), water level sensing, dark-theme Web UI with program management, REST API, MQTT Auto-Discovery for Home Assistant. Communicates with the base controller via I2C.
+
+Communication: register-based I2C protocol (slave address `0x20`, 100 kHz). The ESP32 writes relay/motor requests and reads temperature, RPM, flags, and error state. A 500 ms heartbeat keeps the base controller's 2-second watchdog alive. See [I2C_PROTOKOLL.md](I2C_PROTOKOLL.md) for the full register map.
+
+## Features
+
+- 7 predefined wash programs (20/30/40/60/90°C, Quick, Spin-only) with realistic wash motion profiles (Normal, Gentle, Wool)
+- Custom wash programs stored as JSON on ESP32 flash (LittleFS)
+- Web UI for program selection, monitoring, and custom program creation
+- MQTT Auto-Discovery for Home Assistant (sensors, buttons, select entity)
+- Poti test modes for development without real hardware (Nano: A1=temp, A2=RPM; ESP32: GPIO32=water level)
+
+## Repository
+
+- `3226TEST/` — ATTiny3226 low-level controller (original hardware)
+- `NanoWashy/` — Arduino Nano low-level controller (recommended for development)
+- `ESP32Washy/` — ESP32 high-level controller (Arduino framework, PlatformIO)
+- `esphome/` — earlier ESPHome-based reference (legacy)
+- `mr_washi/` — KiCad hardware design files
+
+See [SETUP_ANLEITUNG.md](SETUP_ANLEITUNG.md) for build, flash, and wiring instructions.
+
+the board is intended to be locally produceable, by hand soldering and easy to repair. We avoided "special" components for easy component substitution.
 Unit cost is not a concerning factor, this is about the availability of a workable design that can be fitted with whatever components are available.
 
 Thanks to Aisler for the Protoype PCBs and Farnell for supporting us with parts!

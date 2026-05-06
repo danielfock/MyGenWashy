@@ -54,7 +54,7 @@ Es gibt drei Firmware-Projekte — je nach verwendetem Mikrocontroller den richt
 |----------|--------|------------|--------------|
 | **ATTiny3226** | `MyGenWashy/3226TEST` | ATTiny3226-S | Original-Hardware, UPDI-Programmer nötig |
 | **Arduino Nano** | `MyGenWashy/NanoWashy` | ATmega328P | Einfacher, Upload direkt über USB |
-| **ESP32 Zweitcontroller** | `MyGenWashy/ESP32Washy` | ESP32 Dev Module | Arduino-Firmware mit Web UI, REST und I2C-Master |
+| **ESP32 Zweitcontroller** | `MyGenWashy/ESP32Washy` | ESP32 Dev Module | Arduino-Firmware: Web UI, Waschprogramme, MQTT, I2C-Master, Water-Level |
 
 1. VS Code öffnen
 2. **File → Open Folder...** → zum jeweiligen Ordner navigieren und öffnen
@@ -161,7 +161,7 @@ Arduino Nano              Intermediary Board (ULN2003)
 
 **Wichtig — AREF-Pin:** Der NTC-Spannungsteiler arbeitet mit 3.3V. Der AREF-Pin des Nano muss mit dem 3.3V-Pin des Nano verbunden werden (kurzer Draht auf dem Board). Ohne diese Verbindung sind die Temperaturwerte falsch.
 
-**Wichtig — Sensortrennung:** Temperatur (`A0`) und Drehzahl/Null-Durchgang (`D2/D3`) liegen am Nano-Basiscontroller. Die Water-Level-Sensoren liegen **nicht** mehr am Nano.
+**Wichtig — Sensortrennung:** Temperatur (`A0`) und Drehzahl/Null-Durchgang (`D2/D3`) liegen am Nano-Basiscontroller. Die Water-Level-Sensoren liegen **nicht** am Nano, sondern direkt am ESP32 (`GPIO34/35`). Die Nano-Pins `D11`/`D12` und `A3` sind dadurch frei fuer Erweiterungen.
 
 ---
 
@@ -283,48 +283,68 @@ Wichtig dazu:
 - Es gibt dort **keine internen Pull-ups**.
 - Fuer Active-Low-Schwimmerschalter sind daher externe Pull-ups nach `3.3V` erforderlich, z. B. `10k`.
 
-### 5.4 Web UI und REST API
+### 5.4 WiFi-Zugangsdaten einrichten
 
-Der ESP32 bringt eine einfache Weboberflaeche direkt mit. Standardverhalten:
+Die WLAN-Daten stehen in `ESP32Washy/src/wifi_credentials.h`. Diese Datei ist **nicht** im Git-Repository (`.gitignore`). Erstelle sie manuell:
 
-- Wenn `WIFI_STA_SSID` und `WIFI_STA_PASSWORD` in [config.h](C:\Users\danie\Dokumente\GitHub\MyGenWashy\ESP32Washy\src\config.h) leer bleiben, startet der ESP32 einen lokalen Access Point `MyGenWashy-ESP32`.
-- Wenn du dort WLAN-Daten eintraegst, verbindet sich der ESP32 zusaetzlich mit deinem Netzwerk.
-- Die Web UI ist dann unter der im Seriellen Monitor ausgegebenen IP erreichbar.
+```cpp
+#define WIFI_SSID "DeinNetzwerkName"
+#define WIFI_PASS "DeinWLANPasswort"
 
-In der Weboberflaeche kann jetzt auch die Home-Assistant-Anbindung eingestellt werden:
+// Optional, fuer Home Assistant MQTT:
+// #define MQTT_SERVER "192.168.x.x"
+// #define MQTT_USER   "mqtt_user"
+// #define MQTT_PASS   "mqtt_passwort"
+```
 
-- `MQTT`: Server, Port, Benutzer, Passwort, Topic-Prefix und Discovery-Prefix werden direkt im ESP32 gespeichert.
-- `ESPHome API Alternative`: deaktiviert MQTT in der Arduino-Firmware als bewusste Alternativauswahl.
+Wenn `wifi_credentials.h` fehlt oder leer ist, startet der ESP32 einen Access Point mit dem Namen `MyGenWashy-Setup` (Passwort: `mygenwashy`).
 
-Wichtige HTTP-Endpunkte:
+### 5.5 Web UI und REST API
 
-- `GET /api/status` liefert JSON mit Temperatur, Ist-RPM, Soll-RPM, Flags, Wasserstand und Fehlerzustand
-- `POST /api/request?lock=1&drain=0&inlet1=0&inlet2=0&heater=0&motor=1&rpm=55` setzt Anforderungen an den Basiscontroller
-- `POST /api/all_off` loescht alle Anforderungen und sendet `CMD_ALL_OFF`
-- `POST /api/reset_error` quittiert einen Fehler mit `CMD_RESET_ERROR`
+Der ESP32 bringt eine Weboberflaeche mit Dark-Theme und zwei Tabs:
 
-Damit kann Home Assistant oder ein anderes Smarthome-System den ESP32 ueber REST ansprechen. Die automatische ESPHome-Entity-Erzeugung entfällt dabei bewusst, weil der ESP32 jetzt als eigene Arduino-Firmware laeuft.
+1. **Programmwahl**: Vordefinierte und eigene Waschprogramme auswaehlen, starten, pausieren, stoppen.
+2. **Neu erstellen**: Eigene Programme mit Temperatur, RPM, Zeiten und Optionen anlegen. Eigene Programme werden auf dem Flash (LittleFS) gespeichert und ueberleben Neustarts.
 
-Wichtig zur `ESPHome API Alternative`:
+Die Web UI ist erreichbar unter der IP-Adresse, die im Seriellen Monitor angezeigt wird, oder ueber mDNS: `http://mygenwashy.local`.
 
-- Die native ESPHome-API ist nicht Bestandteil dieser Arduino-Firmware.
-- Der auswählbare Alternativmodus dient dazu, MQTT sauber abzuschalten und die Integrationsentscheidung im Geraet zu speichern.
-- Fuer eine echte ESPHome-Native-API bleibt die Legacy-ESPHome-Firmware im Ordner `esphome/` die Referenz.
+REST-API-Endpunkte:
 
-Zusätzlich veröffentlicht die ESP32-Firmware Water-Level LOW/HIGH auch per MQTT Auto-Discovery als eigene Binary-Sensoren fuer Home Assistant.
+- `GET /api/status` — JSON mit Temperatur, RPM, Fortschritt, Wasserstand, Programmstatus, WiFi-RSSI
+- `GET /api/programs` — Liste aller verfuegbaren Waschprogramme (vordefiniert + benutzerdefiniert)
+- `POST /api/select` (`idx=N`) — Programm nach Index auswaehlen
+- `POST /api/start` — Gewaehltes Programm starten
+- `POST /api/stop` — Programm sofort abbrechen (Notaus)
+- `POST /api/pause` — Programm pausieren (Ausgaenge aus, Tuer verriegelt)
+- `POST /api/resume` — Pausiertes Programm fortsetzen
+- `POST /api/reset` — Fehler quittieren und Idle-Zustand wiederherstellen
+- `POST /api/programs/add` (JSON Body) — Eigenes Programm erstellen
+- `POST /api/programs/delete` (`idx=N`) — Eigenes Programm loeschen (nur Custom-Programme)
 
-Hinweise zur Drehzahlsicherheit:
+### 5.6 MQTT und Home Assistant
 
-- Die hohe Ebene darf Drehzahlen von `0..1500 RPM` vorgeben.
-- Werte zwischen `1` und `29 RPM` behandelt der Basiscontroller als `0`.
-- Die aktuelle Trommeldrehzahl darf `1500 RPM` nie ueberschreiten. Bei einer gemessenen Ueberschreitung kappt die Firmware die Motorleistung sofort und geht auf Fehler.
+Wenn `MQTT_SERVER` in `wifi_credentials.h` definiert ist, verbindet sich der ESP32 automatisch mit dem MQTT-Broker und sendet **MQTT Auto-Discovery** Nachrichten fuer Home Assistant. Folgende Entities werden angelegt:
 
-Hinweise zur Watchdog-Absicherung:
+Sensoren: Temperatur, Drehzahl, Fortschritt (%), Status, Programm.
+Binary Sensors: Tuer verriegelt, Controller verbunden, Fehler.
+Buttons: Start, Stop, Pause, Resume, Reset.
+Select: Waschprogramm-Auswahl (alle Programme als Dropdown).
 
-- Der Arduino-Nano-Basiscontroller besitzt einen Hardware-Watchdog.
-- Nach einem Watchdog-Reset bleibt der Basiscontroller in einem sicheren Fehlerzustand, bis `Fehler quittieren` gesendet wird.
-- Solange aktive Relais- oder Motordemands anliegen, muss der ESP32 die Registeranforderung zyklisch aktualisieren. Die Arduino-Firmware macht das automatisch als Heartbeat.
-- Faellt das Heartbeat-Update aus, geht der Basiscontroller auf Fehler, schaltet Heizung und Zulauf ab, stoppt den Motor und aktiviert Pumpe sowie Verriegelung.
+Alle Entities erscheinen in Home Assistant automatisch unter dem Geraet "MyGenWashy" (Hersteller: MayerMakes / TuttleButtle).
+
+MQTT-Konfiguration in `ESP32Washy/src/config.h`:
+
+```cpp
+#define MQTT_PORT             1883
+#define MQTT_TOPIC_PREFIX     "mygenwashy"
+#define MQTT_DISCOVERY_PREFIX "homeassistant"
+```
+
+### 5.7 Sicherheitshinweise
+
+Drehzahl: Die Wasch-RPM liegen typisch bei 20..120 RPM (je nach Bewegungsprofil). Schleuderdrehzahlen bis 1500 RPM sind moeglich. Bei gemessener Ueberschreitung von 1500 RPM kappt der Basiscontroller die Motorleistung sofort und meldet `ERR_MOTOR_OVERSPEED`.
+
+Watchdog: Der Nano-Basiscontroller besitzt einen Hardware-Watchdog. Nach einem Watchdog-Reset bleibt er im sicheren Fehlerzustand. Der ESP32 schreibt automatisch alle 500 ms ein Heartbeat-Update an den Nano (innerhalb des 2-Sekunden-Watchdog-Fensters). Faellt das Heartbeat aus, schaltet der Nano Heizung und Zulauf ab, stoppt den Motor und aktiviert Pumpe sowie Verriegelung.
 
 ---
 
@@ -417,17 +437,91 @@ Der angeschlossene Chip stimmt nicht mit der Konfiguration überein. In `platfor
 
 ---
 
-## 8. Nächste Schritte
+## 8. Test-Modi
+
+### 8.1 Nano POTI_TEST_MODE
+
+Der Basiscontroller kann ohne echte Sensorhardware getestet werden. In `NanoWashy/src/config.h`:
+
+```cpp
+#define POTI_TEST_MODE    1   // 1 = Poti-Simulation, 0 = echte Hardware
+```
+
+Im Testmodus werden zwei Potentiometer als Sensoren verwendet:
+
+- `A1` (Poti Temperatur): Linear 0..100 °C
+- `A2` (Poti RPM): Linear 0..1500 RPM, simuliert Tacho-Signal
+
+Zero-Cross und Tacho-ISRs sind deaktiviert, TRIAC wird nicht gezuendet. Watchdog-Signale werden kuenstlich erzeugt.
+
+### 8.2 ESP32 WATER_LEVEL_MODE
+
+Der Wasserstand-Sensor am ESP32 hat drei Betriebsmodi. Die Einstellung erfolgt in `ESP32Washy/src/config.h` (Zeile 49):
+
+```cpp
+#define WATER_LEVEL_MODE  2   // 0 = Schwimmerschalter, 1 = Poti, 2 = Timer
+```
+
+| Mode | Name | Hardware | Anwendung |
+|------|------|----------|-----------|
+| 0 | Schwimmerschalter | GPIO34 (LOW) + GPIO35 (HIGH) | Echtbetrieb / Produktion |
+| 1 | Poti-Test | GPIO32 (ADC, 12-bit) | Hardware-Test am Steckbrett |
+| 2 | Timer-Simulation | Keine | Software-Test ohne Sensor |
+
+**Mode 0 — Schwimmerschalter (Produktion):** Echte Float-Switches an `GPIO34` (LOW) und `GPIO35` (HIGH). Active-Low, externe 10k Pull-ups nach 3.3V erforderlich (GPIO34/35 haben keine internen Pull-ups).
+
+**Mode 1 — Poti-Test (Hardware-Testbetrieb):** Poti an `GPIO32` (ADC1_CH4, 12-bit, 0..4095). Drei Zonen: 0..1364 = Leer, 1365..2729 = LOW aktiv, 2730..4095 = LOW + HIGH aktiv. Ideal wenn man mit einem Poti am Steckbrett den Wasserstand simulieren will.
+
+**Mode 2 — Timer-Simulation (Software-Test):** Kein Sensor noetig. Der Wasserstand wird rein zeitgesteuert simuliert: Beim Fuellen meldet sich LOW nach 10 Sekunden und HIGH nach 20 Sekunden. Beim Abpumpen sinkt der Pegel nach 20 Sekunden unter LOW. Die Zeiten sind in `config.h` ueber `SIM_FILL_LOW_MS`, `SIM_FILL_HIGH_MS` und `SIM_DRAIN_EMPTY_MS` anpassbar. Ideal fuer reine Software-Tests ohne jegliche Sensor-Hardware.
+
+Nach dem Aendern des Modus muss der ESP32 neu kompiliert und geflasht werden (`pio run -t upload`).
+
+---
+
+## 9. Waschprogramme
+
+### 9.1 Vordefinierte Programme
+
+Der ESP32 bringt 7 Standard-Waschprogramme mit:
+
+| Programm | Temp | Wasch-RPM | Schleuder-RPM | Waschzeit | Bewegung |
+|----------|------|-----------|---------------|-----------|----------|
+| Kalt 20°C | 20°C | 40 | 800 | 15 min | Schonend |
+| Pflegeleicht 30°C | 30°C | 40 | 1000 | 20 min | Schonend |
+| Bunt 40°C | 40°C | 55 | 1200 | 25 min | Normal |
+| Koch 60°C | 60°C | 55 | 1400 | 30 min | Normal + Extra-Spuelung |
+| Kochwaesche 90°C | 90°C | 55 | 1400 | 35 min | Normal + Vorwaesche + Extra-Spuelung |
+| Schnell 40°C | 40°C | 55 | 1200 | 10 min | Normal |
+| Nur Schleudern | — | — | 1200 | — | Nur Schleudern |
+
+### 9.2 Waschbewegungsprofile
+
+Die Trommel laeuft nicht durchgehend, sondern in Intervallen (Laufzeit / Pause):
+
+- **Normal**: 55 RPM, 12s an / 3s aus — Standard fuer Baumwolle
+- **Schonend**: 40 RPM, 5s an / 10s aus — Synthetik, empfindliche Stoffe
+- **Wolle**: 25 RPM, 3s an / 27s aus — Minimal-Bewegung
+- **Benutzerdefiniert**: Frei waehlbare Werte
+
+Referenzen: Miele Professional Waschzeiten, AEG Wollprogramm, BSH Patent-Analyse.
+
+### 9.3 Benutzerdefinierte Programme
+
+Eigene Programme koennen ueber die Web UI erstellt werden. Sie werden als JSON in `/programs.json` auf dem ESP32-Flash (LittleFS) gespeichert und ueberleben Neustarts. Maximal 8 eigene Programme zusaetzlich zu den 7 Standard-Programmen.
+
+---
+
+## 10. Naechste Schritte
 
 Nach erfolgreichem Build und Flash:
 
 1. **Basiscontroller alleine testen**: Ohne ESP32-Zweitcontroller bleibt die Firmware im Bereitschaftszustand. Fuer erste Tests ohne angeschlossene 230V-Peripherie die Relais-Ausgaenge mit LEDs und Vorwiderstaenden bestuecken.
 
-2. **Mit ESP32 testen**: ESP32 ueber J13 verbinden, Water-Level-Sensoren an `GPIO34/35` anschliessen. Danach im Browser-Webinterface oder in Home Assistant per MQTT die Sensorwerte beobachten und gezielt Relais- sowie Drehzahlanforderungen senden.
+2. **Mit ESP32 testen**: ESP32 ueber J13 verbinden. Fuer den Wasserstand `WATER_LEVEL_MODE` in `config.h` waehlen: Mode 2 (Timer) fuer reine Software-Tests, Mode 1 (Poti an GPIO32) fuer Hardware-Tests am Steckbrett, Mode 0 (Schwimmerschalter an GPIO34/35) fuer den Echtbetrieb. Web UI im Browser oeffnen und Waschprogramme testen.
 
-3. **Ablauflogik aufbauen**: Der komplette Waschprogrammablauf gehoert jetzt auf den ESP32. Dort werden aus Temperatur, Water Level und UI die I2C-Befehle fuer den Basiscontroller erzeugt.
+3. **Home Assistant anbinden**: MQTT-Server in `wifi_credentials.h` eintragen. Nach dem Neustart erscheinen alle Entities automatisch in Home Assistant.
 
 Die Trennung ist damit:
 
-- Basiscontroller: Motorregelung, Rampen, Relaisumsetzung, Temperaturueberwachung, Temperaturreadout
-- ESP32-Zweitcontroller: UI, Programmablaufsteuerung, Smarthome
+- Basiscontroller (Nano): Motorregelung, Rampen, Relaisumsetzung, Temperaturueberwachung
+- ESP32-Zweitcontroller: Waschprogramm-Ablaufsteuerung, Wasserstandsmessung, Web UI, MQTT/Home Assistant

@@ -31,24 +31,43 @@
 // --- Webserver ---
 #define WEBSERVER_PORT        80
 
-// --- Water Level Sensors (direkt am ESP32) ---
-// Schwimmerschalter: LOW = Sensor ausgeloest (Wasser auf Sensorhoehe).
-// GPIO34/35 haben keine internen Pull-ups, daher sind externe Pull-ups
-// nach 3.3V erforderlich. Active-Low wie beim bisherigen Logikmodell.
-#define PIN_WATER_LOW         34    // GPIO34 - Float switch LOW (input-only)
-#define PIN_WATER_HIGH        35    // GPIO35 - Float switch HIGH (input-only)
-#define WATER_SENSOR_ACTIVE   LOW
+// --- Water Level Sensor Mode ---
+// Bestimmt wie der Wasserstand erfasst wird:
+//
+//   0 = FLOAT_SWITCH  Echte Schwimmerschalter an GPIO34/35 (Produktion)
+//                     GPIO34/35 sind input-only, KEINE internen Pull-ups!
+//                     Externe 10k Pull-ups nach 3.3V erforderlich.
+//
+//   1 = POTI_TEST     Poti an GPIO32 simuliert Wasserstand (Testbetrieb)
+//                     3 Zonen: Leer / LOW / LOW+HIGH (12-bit ADC)
+//
+//   2 = TIMER_SIM     Kein Sensor noetig (reiner Software-Test)
+//                     Wasserstand wird zeitgesteuert simuliert:
+//                     Fuellen: LOW nach 60s, HIGH nach 90s
+//                     Abpumpen: Leer nach 30s
+//
+#define WATER_LEVEL_MODE      2
 
-// --- Water Level Test Mode (Poti statt Schwimmerschalter) ---
-// Zum Testen ohne echte Hardware: Wasserstand ueber Poti simulieren.
-//   GPIO32 (ADC1_CH4): Wasserstand-Poti → 3 Zonen (Leer / LOW / LOW+HIGH)
-// Zum Aktivieren: WATER_POTI_TEST auf 1 setzen.
-#define WATER_POTI_TEST       0
+// Mode 0: Schwimmerschalter
+#if WATER_LEVEL_MODE == 0
+  #define PIN_WATER_LOW           34    // GPIO34 - Float switch LOW (input-only)
+  #define PIN_WATER_HIGH          35    // GPIO35 - Float switch HIGH (input-only)
+  #define WATER_SENSOR_ACTIVE     LOW
 
-#if WATER_POTI_TEST
-  #define PIN_POTI_WATER      32    // GPIO32 - ADC1_CH4 fuer Wasserstand-Poti
-  #define POTI_WATER_LOW_THRESH   1365  // ESP32 ADC 12-bit: 0..4095
-  #define POTI_WATER_HIGH_THRESH  2730  // 3 Zonen: 0..1364=Leer, 1365..2729=LOW, 2730..4095=LOW+HIGH
+// Mode 1: Poti-Test
+#elif WATER_LEVEL_MODE == 1
+  #define PIN_POTI_WATER          32    // GPIO32 - ADC1_CH4
+  #define POTI_WATER_LOW_THRESH   1365  // 0..1364 = Leer
+  #define POTI_WATER_HIGH_THRESH  2730  // 1365..2729 = LOW, 2730..4095 = LOW+HIGH
+
+// Mode 2: Timer-Simulation
+#elif WATER_LEVEL_MODE == 2
+  #define SIM_FILL_LOW_MS     10000UL   // 10s bis Wasser LOW erreicht
+  #define SIM_FILL_HIGH_MS    20000UL   // 20s bis Wasser HIGH erreicht
+  #define SIM_DRAIN_EMPTY_MS  20000UL   // 20s bis Wasser unter LOW sinkt
+
+#else
+  #error "WATER_LEVEL_MODE muss 0, 1 oder 2 sein"
 #endif
 
 // --- Debug ---
