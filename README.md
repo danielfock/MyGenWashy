@@ -8,6 +8,13 @@ the team tested their theories on how safety mechanisms and machine parts worked
 At the end of day two the machine was running a cold wash programm from a dev kit and some homemade electronics controlled via ESP-home.
 On day three the learnings and circuits were converted into a kicad design for further testing and software development.
 
+The repository now contains:
+
+- `3226TEST/` for the ATTiny3226 low-level controller
+- `NanoWashy/` for the Arduino Nano low-level controller
+- `ESP32Washy/` for the ESP32 high-level controller using the Arduino framework
+- `esphome/` as an earlier ESPHome-based reference
+
 the board is intended to be locally produceable, by hand soldering and easy to repair. We avoided  "special" components for easy component substitution.
 Unit cost is not a concerning factor, this is about the availability of a workable design that can be fitted with whatever components are available.
 

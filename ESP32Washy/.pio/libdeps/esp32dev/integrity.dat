@@ -1,0 +1,7 @@
+bblanchon/ArduinoJson@^7.0.0
+Wire
+LittleFS
+knolleary/PubSubClient@^2.8
+ESPmDNS
+WiFi
+WebServer

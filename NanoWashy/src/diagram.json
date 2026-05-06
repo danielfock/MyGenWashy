@@ -1,0 +1,246 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-nano",
+      "id": "nano",
+      "top": 0.6,
+      "left": -0.6,
+      "attrs": { "frequency": "16m" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_board",
+      "top": 192,
+      "left": 0,
+      "attrs": { "text": "Arduino Nano\nATmega328P / 16MHz" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "ntc",
+      "top": -279.7,
+      "left": 134.2,
+      "attrs": { "value": "512" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_ntc",
+      "top": -268.8,
+      "left": 9.6,
+      "attrs": { "text": "NTC ADC Sim\nA0" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_lock",
+      "top": -224.4,
+      "left": 368.6,
+      "attrs": { "color": "red", "label": "LOCK D4" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_lock",
+      "top": -188.05,
+      "left": 211.2,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_drain",
+      "top": -224.4,
+      "left": 407,
+      "attrs": { "color": "white", "label": "DRAIN D5" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_drain",
+      "top": -159.25,
+      "left": 230.4,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_water1",
+      "top": -224.4,
+      "left": 455,
+      "attrs": { "color": "blue", "label": "WATER_INLET_1 D6" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_water1",
+      "top": -130.45,
+      "left": 249.6,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_water2",
+      "top": -224.4,
+      "left": 551,
+      "attrs": { "color": "cyan", "label": "WATER_INLET_2 D7" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_water2",
+      "top": -101.65,
+      "left": 268.8,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_heater",
+      "top": -224.4,
+      "left": 637.4,
+      "attrs": { "color": "orange", "label": "HEATER D8" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_heater",
+      "top": -72.85,
+      "left": 288,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_men",
+      "top": -224.4,
+      "left": 695,
+      "attrs": { "color": "magenta", "label": "MOTOR_ENABLE D10" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_men",
+      "top": -44.05,
+      "left": 307.2,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_mpwm",
+      "top": -224.4,
+      "left": 781.4,
+      "attrs": { "color": "purple", "label": "MOTOR_PWM D9" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_mpwm",
+      "top": -15.25,
+      "left": 326.4,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_zero",
+      "top": 111.8,
+      "left": 48,
+      "attrs": { "color": "green", "label": "ZERO_CROSS D2", "key": "Z", "bounce": "0" }
+    },
+    {
+      "type": "wokwi-clock-generator",
+      "id": "tacho_gen_wash",
+      "top": -48,
+      "left": -220.8,
+      "attrs": { "frequency": "0.92" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_tacho_gen_wash",
+      "top": 0,
+      "left": -259.2,
+      "attrs": { "text": "TACHO Waschen\n0.92 Hz = 55 RPM" }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "sw_water_low",
+      "top": -197.2,
+      "left": -131.3,
+      "attrs": { "value": "1", "bounce": "0" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_sw_water_low",
+      "top": -211.2,
+      "left": -268.8,
+      "attrs": { "text": "WATER_LOW D11\nleft = active LOW" }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "sw_water_high",
+      "top": -139.6,
+      "left": -131.3,
+      "attrs": { "value": "1", "bounce": "0" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_sw_water_high",
+      "top": -144,
+      "left": -268.8,
+      "attrs": { "text": "WATER_HIGH D12\nleft = active LOW" }
+    },
+    {
+      "type": "wokwi-clock-generator",
+      "id": "tacho_gen_spin",
+      "top": 96,
+      "left": -220.8,
+      "attrs": { "frequency": "23.33" }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "sw_tacho_mode",
+      "top": -72.4,
+      "left": -140.9,
+      "attrs": { "value": "" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_sw_tacho_mode",
+      "top": 43.2,
+      "left": -278.4,
+      "attrs": { "text": "TACHO Mode D3\nleft = Waschen, right = Schleudern" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_tacho_gen_spin",
+      "top": 153.6,
+      "left": -268.8,
+      "attrs": { "text": "TACHO Generator Schleudern\nD3\n23.33 Hz = 1400 RPM" }
+    }
+  ],
+  "connections": [
+    [ "ntc:VCC", "nano:5V", "red", [ "h-0.8", "v307.2", "h-48.1" ] ],
+    [ "ntc:GND", "nano:GND.1", "black", [ "v9.6", "h28.8", "v278.4", "h-48.1" ] ],
+    [ "ntc:SIG", "nano:A0", "cyan", [ "v9.6", "h-0.4", "v288", "h-124.9" ] ],
+    [ "nano:4", "r_lock:1", "green", [ "v-72.6", "h115.3" ] ],
+    [ "r_lock:2", "led_lock:A", "green", [] ],
+    [ "led_lock:C", "nano:GND.1", "black", [ "v297.6", "h-191.7" ] ],
+    [ "nano:5", "r_drain:1", "green", [ "v-63", "h144.1" ] ],
+    [ "r_drain:2", "led_drain:A", "green", [] ],
+    [ "led_drain:C", "nano:GND.1", "black", [ "v307.2", "h-230.1" ] ],
+    [ "nano:6", "r_water1:1", "green", [ "v-53.4", "h172.9" ] ],
+    [ "r_water1:2", "led_water1:A", "green", [] ],
+    [ "led_water1:C", "nano:GND.1", "black", [ "v316.8", "h-278.1" ] ],
+    [ "nano:7", "r_water2:1", "green", [ "v-43.8", "h201.7" ] ],
+    [ "r_water2:2", "led_water2:A", "green", [] ],
+    [ "led_water2:C", "nano:GND.1", "black", [ "v326.4", "h-374.1" ] ],
+    [ "nano:8", "r_heater:1", "green", [ "v-34.2", "h230.5" ] ],
+    [ "r_heater:2", "led_heater:A", "green", [] ],
+    [ "led_heater:C", "nano:GND.1", "black", [ "v336", "h-460.5" ] ],
+    [ "nano:10", "r_men:1", "green", [ "v-24.6", "h268.9" ] ],
+    [ "r_men:2", "led_men:A", "green", [] ],
+    [ "led_men:C", "nano:GND.1", "black", [ "v345.6", "h-518.1" ] ],
+    [ "nano:9", "r_mpwm:1", "green", [ "v-15", "h278.5" ] ],
+    [ "r_mpwm:2", "led_mpwm:A", "green", [] ],
+    [ "led_mpwm:C", "nano:GND.1", "black", [ "v355.2", "h-604.5" ] ],
+    [ "nano:2", "btn_zero:1.l", "purple", [ "v-5.4", "h-124.7", "v124.8" ] ],
+    [ "btn_zero:2.r", "nano:GND.1", "black", [] ],
+    [ "sw_water_low:1", "nano:GND.1", "black", [ "v19.2", "h316.8", "v220.8", "h-48.1" ] ],
+    [ "sw_water_low:2", "nano:11", "orange", [ "v9.6", "h144" ] ],
+    [ "sw_water_high:1", "nano:GND.1", "black", [ "v19.2", "h316.8", "v163.2", "h-48.1" ] ],
+    [ "sw_water_high:2", "nano:12", "orange", [ "v9.6", "h134.4" ] ],
+    [ "tacho_gen_wash:CLK", "sw_tacho_mode:1", "blue", [ "v0", "h76.8" ] ],
+    [ "tacho_gen_spin:CLK", "sw_tacho_mode:3", "green", [ "v0", "h76.8" ] ],
+    [ "sw_tacho_mode:2", "nano:3", "gold", [ "v19.2", "h67.3", "v-57.6", "h163.1" ] ]
+  ],
+  "dependencies": {}
+}
