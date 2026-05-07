@@ -75,7 +75,7 @@
 // Zum Aktivieren: POTI_TEST_MODE auf 1 setzen.
 // Fuer echte Hardware: POTI_TEST_MODE auf 0 setzen (Originalverhalten).
 // ============================================================================
-#define POTI_TEST_MODE    0
+#define POTI_TEST_MODE    1
 
 #if POTI_TEST_MODE
   #define PIN_POTI_TEMP       A1    // Poti fuer simulierte Temperatur

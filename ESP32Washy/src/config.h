@@ -31,6 +31,11 @@
 // --- Webserver ---
 #define WEBSERVER_PORT        80
 
+// --- WiFi Stabilitaet ---
+// Etwas reduzierte Sendeleistung hilft bei grenzwertiger Versorgung, weil
+// die Stromspitzen beim Start und Senden kleiner werden.
+#define WIFI_TX_POWER         WIFI_POWER_11dBm
+
 // --- Water Level Sensor Mode ---
 // Bestimmt wie der Wasserstand erfasst wird:
 //
@@ -41,7 +46,7 @@
 //   1 = POTI_TEST     Poti an GPIO32 simuliert Wasserstand (Testbetrieb)
 //                     3 Zonen: Leer / LOW / LOW+HIGH (12-bit ADC)
 //
-//   2 = TIMER_SIM     Kein Sensor noetig (reiner Software-Test)
+//   2 = TIMER_SIM     Kein Sensor noetig (nur Timer / reiner Software-Test)
 //                     Wasserstand wird zeitgesteuert simuliert:
 //                     Fuellen: LOW nach 10s, HIGH nach 20s
 //                     Abpumpen: Leer nach 20s
@@ -60,7 +65,7 @@
   #define POTI_WATER_LOW_THRESH   1365  // 0..1364 = Leer
   #define POTI_WATER_HIGH_THRESH  2730  // 1365..2729 = LOW, 2730..4095 = LOW+HIGH
 
-// Mode 2: Timer-Simulation
+// Mode 2: nur Timer
 #elif WATER_LEVEL_MODE == 2
   #define SIM_FILL_LOW_MS     10000UL   // 10s bis Wasser LOW erreicht
   #define SIM_FILL_HIGH_MS    20000UL   // 20s bis Wasser HIGH erreicht

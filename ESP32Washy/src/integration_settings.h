@@ -124,8 +124,13 @@ private:
     }
 
     bool _load() {
+        if (!LittleFS.exists(INTEGRATION_SETTINGS_FILE)) {
+            return false;
+        }
+
         File file = LittleFS.open(INTEGRATION_SETTINGS_FILE, "r");
         if (!file) {
+            Serial.println(F("[SETTINGS] integration.json konnte nicht gelesen werden"));
             return false;
         }
 

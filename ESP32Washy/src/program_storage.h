@@ -37,6 +37,8 @@ public:
             memcpy(&_programs[i], &DEFAULT_PROGRAMS[i], sizeof(WashProgramDef));
         }
 
+        _ensureProgramsFile();
+
         // Benutzerdefinierte Programme aus Flash laden
         _loadCustomPrograms();
 
@@ -144,12 +146,28 @@ private:
     WashProgramDef _programs[MAX_TOTAL_PROGRAMS];
     uint8_t _totalCount = 0;
 
+    void _ensureProgramsFile() {
+        if (!_ready) return;
+
+        File file = LittleFS.open(PROGRAMS_FILE, "a+");
+        if (!file) {
+            Serial.println(F("[STORAGE] programs.json konnte nicht angelegt werden"));
+            return;
+        }
+
+        if (file.size() == 0) {
+            file.print("[]");
+            Serial.println(F("[STORAGE] programs.json neu angelegt"));
+        }
+        file.close();
+    }
+
     void _loadCustomPrograms() {
         if (!_ready) return;
 
         File file = LittleFS.open(PROGRAMS_FILE, "r");
         if (!file) {
-            Serial.println(F("[STORAGE] Keine gespeicherten Programme"));
+            Serial.println(F("[STORAGE] programs.json konnte nicht gelesen werden"));
             return;
         }
 
@@ -164,6 +182,11 @@ private:
         }
 
         JsonArray arr = doc.as<JsonArray>();
+        if (arr.isNull() || arr.size() == 0) {
+            Serial.println(F("[STORAGE] Keine gespeicherten Programme"));
+            return;
+        }
+
         for (JsonObject obj : arr) {
             if (_totalCount >= MAX_TOTAL_PROGRAMS) break;
 

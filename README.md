@@ -24,7 +24,9 @@ Communication: register-based I2C protocol (slave address `0x20`, 100 kHz). The 
 - Custom wash programs stored as JSON on ESP32 flash (LittleFS)
 - Web UI for program selection, monitoring, and custom program creation
 - MQTT Auto-Discovery for Home Assistant (sensors, buttons, select entity)
-- Poti test modes for development without real hardware (Nano: A1=temp, A2=RPM; ESP32: GPIO32=water level)
+- 3 water level modes on ESP32: float switches (production), potentiometer (hardware test), timer simulation (software-only test)
+- Poti test mode on Nano for development without real hardware (A1=temp, A2=RPM)
+- Persistent integration settings (MQTT server, topics) stored on ESP32 flash via LittleFS
 
 ## Repository
 

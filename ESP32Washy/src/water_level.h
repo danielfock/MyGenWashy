@@ -17,13 +17,13 @@
 //     Poti an GPIO32 (ADC1_CH4), 12-bit Aufloesung.
 //     3 Zonen: 0..1364 = Leer, 1365..2729 = LOW, 2730..4095 = LOW+HIGH.
 //
-//   Mode 2 — TIMER_SIM (Software-Test, kein Sensor noetig)
+//   Mode 2 — nur Timer (Software-Test, kein Sensor noetig)
 //     Wasserstand wird rein zeitgesteuert simuliert.
 //     Die Ablaufsteuerung meldet per notifyFilling()/notifyDraining()
 //     ob gerade gefuellt oder abgepumpt wird. Das Modul simuliert
 //     daraus realistische Wasserstandswechsel:
-//       Fuellen: LOW nach 60s, HIGH nach 90s
-//       Abpumpen: Leer nach 30s
+//       Fuellen: LOW nach 10s, HIGH nach 20s
+//       Abpumpen: Leer nach 20s
 //     Im Ruhezustand meldet es "Leer".
 //
 // ============================================================================
@@ -46,7 +46,7 @@ public:
         _draining = false;
         _fillStartMs = 0;
         _drainStartMs = 0;
-        Serial.println(F("[WATER] Mode 2: Timer-Simulation (kein Sensor)"));
+        Serial.println(F("[WATER] Mode 2: nur Timer (kein Sensor)"));
 #endif
     }
 
@@ -115,7 +115,7 @@ public:
 #elif WATER_LEVEL_MODE == 1
         return "Poti-Test";
 #else
-        return "Timer-Simulation";
+        return "nur Timer";
 #endif
     }
 
@@ -140,7 +140,7 @@ private:
     unsigned long _fillStartMs;
     unsigned long _drainStartMs;
 
-    // Timer-Simulation: Fuellen
+    // nur Timer: Fuellen
     //   Nach SIM_FILL_LOW_MS  → LOW aktiv (Wasser bis Mindestfuellstand)
     //   Nach SIM_FILL_HIGH_MS → HIGH aktiv (Trommel voll)
     // Abpumpen:

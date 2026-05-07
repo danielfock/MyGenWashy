@@ -272,16 +272,20 @@ J13 Connector           ESP32
 
 ### 5.3.1 Water-Level-Sensoren am ESP32
 
-Die Wasserstandssensoren liegen in der aktuellen Architektur direkt am ESP32:
+Die Wasserstandssensoren liegen in der aktuellen Architektur direkt am ESP32 (nicht am Nano). Der Betriebsmodus wird ueber `WATER_LEVEL_MODE` in `ESP32Washy/src/config.h` gewaehlt (siehe Abschnitt 8.2 fuer Details zu allen drei Modi).
+
+Im Produktionsmodus (Mode 0) werden zwei Schwimmerschalter verwendet:
 
 - `GPIO34` = `WATER_LEVEL_LOW`
 - `GPIO35` = `WATER_LEVEL_HIGH`
 
 Wichtig dazu:
 
-- `GPIO34` und `GPIO35` sind beim ESP32 reine Eingänge.
+- `GPIO34` und `GPIO35` sind beim ESP32 reine Eingaenge.
 - Es gibt dort **keine internen Pull-ups**.
 - Fuer Active-Low-Schwimmerschalter sind daher externe Pull-ups nach `3.3V` erforderlich, z. B. `10k`.
+
+Fuer Tests ohne Sensor-Hardware kann `WATER_LEVEL_MODE` auf 1 (Poti an GPIO32) oder 2 (reine Timer-Simulation) gesetzt werden.
 
 ### 5.4 WiFi-Zugangsdaten einrichten
 
@@ -301,10 +305,12 @@ Wenn `wifi_credentials.h` fehlt oder leer ist, startet der ESP32 einen Access Po
 
 ### 5.5 Web UI und REST API
 
-Der ESP32 bringt eine Weboberflaeche mit Dark-Theme und zwei Tabs:
+Der ESP32 bringt eine Weboberflaeche mit Dark-Theme und vier Tabs:
 
-1. **Programmwahl**: Vordefinierte und eigene Waschprogramme auswaehlen, starten, pausieren, stoppen.
-2. **Neu erstellen**: Eigene Programme mit Temperatur, RPM, Zeiten und Optionen anlegen. Eigene Programme werden auf dem Flash (LittleFS) gespeichert und ueberleben Neustarts.
+1. **Dashboard**: Echtzeit-Status (Temperatur, RPM, Wasserstand, Fortschritt), Programmwahl und Steuerung (Start/Stop/Pause/Reset).
+2. **Programme**: Eigene Programme mit Temperatur, RPM, Zeiten, Bewegungsprofil und Optionen (Vorwaesche, Extra-Spuelung) anlegen. Eigene Programme werden auf dem Flash (LittleFS) gespeichert und ueberleben Neustarts.
+3. **Diagnose**: Detailansicht der Nano-Kommunikation (I2C-Status, Flags, Ausgaenge, Control Request als Hex und Klartext).
+4. **Integration**: MQTT-Server, Port, User/Passwort, Topic- und Discovery-Prefix konfigurieren. Einstellungen werden persistent in LittleFS gespeichert (`/integration.json`). ESPHome-API-Alternative deaktiviert MQTT.
 
 Die Web UI ist erreichbar unter der IP-Adresse, die im Seriellen Monitor angezeigt wird, oder ueber mDNS: `http://mygenwashy.local`.
 
@@ -320,25 +326,31 @@ REST-API-Endpunkte:
 - `POST /api/reset` — Fehler quittieren und Idle-Zustand wiederherstellen
 - `POST /api/programs/add` (JSON Body) — Eigenes Programm erstellen
 - `POST /api/programs/delete` (`idx=N`) — Eigenes Programm loeschen (nur Custom-Programme)
+- `GET /api/integration` — Aktuelle Integrations-Einstellungen (Modus, MQTT-Server, Port, Topics)
+- `POST /api/integration` (JSON Body) — Integrations-Einstellungen aendern und persistent speichern
 
 ### 5.6 MQTT und Home Assistant
 
-Wenn `MQTT_SERVER` in `wifi_credentials.h` definiert ist, verbindet sich der ESP32 automatisch mit dem MQTT-Broker und sendet **MQTT Auto-Discovery** Nachrichten fuer Home Assistant. Folgende Entities werden angelegt:
+MQTT kann auf zwei Wegen konfiguriert werden: statisch ueber `wifi_credentials.h` (Compile-Zeit) oder dynamisch ueber die Web UI im Tab "Integration" (Laufzeit, persistent in LittleFS als `/integration.json`). Die Web-UI-Einstellungen haben Vorrang vor den Compile-Zeit-Defaults.
 
-Sensoren: Temperatur, Drehzahl, Fortschritt (%), Status, Programm.
-Binary Sensors: Tuer verriegelt, Controller verbunden, Fehler.
-Buttons: Start, Stop, Pause, Resume, Reset.
-Select: Waschprogramm-Auswahl (alle Programme als Dropdown).
+Wenn ein MQTT-Server konfiguriert ist, verbindet sich der ESP32 automatisch mit dem Broker und sendet **MQTT Auto-Discovery** Nachrichten fuer Home Assistant. Folgende 16 Entities werden angelegt:
 
-Alle Entities erscheinen in Home Assistant automatisch unter dem Geraet "MyGenWashy" (Hersteller: MayerMakes / TuttleButtle).
+Sensoren (5): Temperatur, Drehzahl, Fortschritt (%), Status, Programm.
+Binary Sensors (5): Tuer verriegelt, Controller verbunden, Fehler, Wasserstand LOW, Wasserstand HIGH.
+Buttons (5): Start, Stop, Pause, Resume, Reset.
+Select (1): Waschprogramm-Auswahl (alle Programme als Dropdown).
 
-MQTT-Konfiguration in `ESP32Washy/src/config.h`:
+Alle Entities erscheinen in Home Assistant automatisch unter dem Geraet "MyGenWashy".
+
+Default-MQTT-Konfiguration in `ESP32Washy/src/config.h`:
 
 ```cpp
 #define MQTT_PORT             1883
 #define MQTT_TOPIC_PREFIX     "mygenwashy"
 #define MQTT_DISCOVERY_PREFIX "homeassistant"
 ```
+
+Alternativ kann ueber die Web UI der Modus "ESPHome API Alternative" gewaehlt werden. Dieser deaktiviert MQTT komplett; die lokale Web-UI und REST-API bleiben aktiv. Die native ESPHome-API ist nicht Teil dieser Arduino-Firmware.
 
 ### 5.7 Sicherheitshinweise
 
@@ -371,13 +383,15 @@ MyGenWashy/
 ├── ESP32Washy/                   ← ESP32 Arduino-/PlatformIO-Projekt
 │   ├── platformio.ini
 │   └── src/
-│       ├── main.cpp              ← Web UI, REST API, I2C-Master
-│       ├── config.h              ← WLAN-, I2C- und Registerkonfiguration
+│       ├── main.cpp              ← Web UI, REST API, MQTT, I2C-Master
+│       ├── config.h              ← I2C-, Timing- und Registerkonfiguration
+│       ├── wifi_credentials.h    ← WLAN + MQTT Zugangsdaten (nicht in Git)
 │       ├── nano_bridge.h         ← I2C-Bridge zum Basiscontroller
-│       ├── water_level.h         ← LOW/HIGH Sensoren direkt am ESP32
-│       ├── wash_program.h        ← Ablaufsteuerung
-│       ├── wash_programs.h       ← Standardprogramme
-│       └── program_storage.h     ← Speicherung eigener Programme
+│       ├── water_level.h         ← Wasserstand (3 Modi: Schwimmer/Poti/Timer)
+│       ├── wash_program.h        ← Ablaufsteuerung (State Machine)
+│       ├── wash_programs.h       ← Vordefinierte Waschprogramme + Bewegungsprofile
+│       ├── program_storage.h     ← Speicherung eigener Programme (LittleFS)
+│       └── integration_settings.h ← Persistente MQTT/Integration-Einstellungen
 ├── esphome/                      ← Fruehe ESPHome-Referenz / Legacy
 │   ├── mygenwashy.yaml           ← ESPHome-Konfiguration
 │   └── secrets.yaml.example      ← Vorlage für WLAN-Credentials

@@ -5,6 +5,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <esp_system.h>
 
 #include "config.h"
 #include "nano_bridge.h"
@@ -62,6 +63,23 @@ unsigned long lastWifiCheck = 0;
 bool mqttConfigured = false;
 bool mqttDiscoverySent = false;
 int8_t selectedProgramIdx = 0;
+
+const char* resetReasonName(esp_reset_reason_t reason) {
+    switch (reason) {
+        case ESP_RST_UNKNOWN:   return "Unbekannt";
+        case ESP_RST_POWERON:   return "Power-On";
+        case ESP_RST_EXT:       return "Externer Reset";
+        case ESP_RST_SW:        return "Software Reset";
+        case ESP_RST_PANIC:     return "Kernel Panic";
+        case ESP_RST_INT_WDT:   return "Interrupt Watchdog";
+        case ESP_RST_TASK_WDT:  return "Task Watchdog";
+        case ESP_RST_WDT:       return "Anderer Watchdog";
+        case ESP_RST_DEEPSLEEP: return "Deep Sleep";
+        case ESP_RST_BROWNOUT:  return "Brownout";
+        case ESP_RST_SDIO:      return "SDIO";
+        default:                return "Nicht zugeordnet";
+    }
+}
 
 // --- Forward Declarations ---
 void setupWifi();
@@ -121,6 +139,11 @@ void setup() {
     Serial.println(F("  MyGenWashy - ESP32 Controller v2.0"));
     Serial.println(F("  Waschprogramme + Smart Home"));
     Serial.println(F("========================================"));
+    esp_reset_reason_t resetReason = esp_reset_reason();
+    Serial.printf("Reset-Grund: %s (%d)\n", resetReasonName(resetReason), (int)resetReason);
+    if (resetReason == ESP_RST_BROWNOUT) {
+        Serial.println(F("[POWER] Brownout erkannt: 3.3V-Versorgung ist eingebrochen"));
+    }
 
     nano.begin();
     waterLevel.begin();
@@ -210,7 +233,10 @@ void loop() {
 // ============================================================================
 void setupWifi() {
     WiFi.setHostname(WIFI_HOSTNAME);
+    WiFi.persistent(false);
+    WiFi.setSleep(true);
     WiFi.mode(WIFI_STA);
+    WiFi.setTxPower(WIFI_TX_POWER);
 
     if (strlen(WIFI_SSID) > 0 && strlen(WIFI_PASS) > 0) {
         Serial.printf("WiFi: %s ...", WIFI_SSID);
@@ -530,8 +556,12 @@ select:focus,input:focus{outline:none;border-color:#38bdf8}
 <div class='divider'></div>
 <div class='grid'>
   <div><div id='motion' class='val' style='font-size:1em'>--</div><div class='label'>Waschbewegung</div></div>
-  <div><div id='door' class='val' style='font-size:1em'>--</div><div class='label'>Tuerverriegelung</div></div>
+  <div><div id='door' class='val' style='font-size:1em'>--</div><div class='label'>Türverriegelung</div></div>
 </div>
+<div class='divider'></div>
+<h2>Programm wählen</h2>
+<select id='psel' onchange='selProg(this.value)'></select>
+<div id='pdet' class='prog-detail'></div>
 <div style='text-align:center;margin-top:8px'>
 <button class='btn btn-start' onclick='cmd("start")'>Start</button>
 <button class='btn btn-pause' onclick='cmd("pause")'>Pause</button>
@@ -541,10 +571,8 @@ select:focus,input:focus{outline:none;border-color:#38bdf8}
 </div>
 
 <div id='tab1' class='panel'>
-<h2>Programm wählen</h2>
-<select id='psel' onchange='selProg(this.value)'></select>
-<div id='pdet' class='prog-detail'></div>
-<div class='hint'>Vorhandene Programme ausw&auml;hlen oder darunter ein neues Profil anlegen.</div>
+<h2>Programme</h2>
+<div class='hint'>Hier verwaltest du Programme und legst neue Profile an. Die aktive Programmauswahl liegt im Dashboard.</div>
 <div class='divider'></div>
 <h2>Eigenes Programm</h2>
 <div class='form-row'><label>Name</label><input id='cp_name' maxlength='23' placeholder='z.B. Feinwäsche 30'></div>
@@ -563,8 +591,8 @@ select:focus,input:focus{outline:none;border-color:#38bdf8}
 <div class='form-row'><label>Laufzeit je Zyklus (s)</label><input id='cp_won' type='number' min='3' max='120' value='12'></div>
 <div class='form-row'><label>Pause je Zyklus (s)</label><input id='cp_woff' type='number' min='0' max='120' value='3'></div>
 </div>
-<div class='form-row'><label><input type='checkbox' id='cp_pre' class='chk'>Vorwaesche</label></div>
-<div class='form-row'><label><input type='checkbox' id='cp_rinse' class='chk'>Extra-Spuelgang</label></div>
+<div class='form-row'><label><input type='checkbox' id='cp_pre' class='chk'>Vorwäsche</label></div>
+<div class='form-row'><label><input type='checkbox' id='cp_rinse' class='chk'>Extra-Spülgang</label></div>
 <div class='hint'>Reale Waschbewegung wird hier als Lauf/Pause-Rhythmus abgebildet. Ein echter Richtungswechsel ist mit der aktuellen Hardware noch nicht verfügbar.</div>
 <div style='text-align:center;margin-top:8px'>
 <button class='btn' style='background:#2563eb' onclick='addProg()'>Speichern</button>
@@ -678,7 +706,7 @@ function updateIntegrationUi(){
     .forEach(id=>document.getElementById(id).disabled=disabled);
   document.getElementById('integration_hint').textContent=
     disabled
-      ? 'Hinweis: Die native ESPHome-API ist nicht in dieser Arduino-Firmware implementiert. Dieser Modus deaktiviert MQTT und laesst die lokale Web-UI aktiv.'
+      ? 'Hinweis: Die native ESPHome-API ist nicht in dieser Arduino-Firmware implementiert. Dieser Modus deaktiviert MQTT und lässt die lokale Web-UI aktiv.'
       : 'MQTT ist aktivierbar. Server, Port und Topics werden in LittleFS gespeichert und nach Neustart wieder geladen.';
 }
 function loadIntegration(){
@@ -797,8 +825,8 @@ function upd(){fetch('/api/status').then(r=>r.json()).then(d=>{
   else{ee.style.display='none';}
   document.getElementById('diag_nano_state').textContent=nanoStateName(d.nano_state);
   document.getElementById('diag_nano_error').textContent=nanoErrorName(d.nano_error);
-  document.getElementById('diag_last_read').textContent=(d.nano_last_read_ms||0)+' ms';
-  document.getElementById('diag_last_write').textContent=(d.nano_last_write_ms||0)+' ms';
+  document.getElementById('diag_last_read').textContent=(((d.nano_last_read_ms||0)/1000).toFixed(1))+' s';
+  document.getElementById('diag_last_write').textContent=(((d.nano_last_write_ms||0)/1000).toFixed(1))+' s';
   document.getElementById('diag_i2c_errors').textContent=String(d.nano_i2c_errors||0);
   document.getElementById('diag_water_mode').textContent=d.water_mode_name||'-';
   document.getElementById('diag_control').textContent=hex8(d.nano_control_request);
