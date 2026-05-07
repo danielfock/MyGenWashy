@@ -43,8 +43,8 @@
 //
 //   2 = TIMER_SIM     Kein Sensor noetig (reiner Software-Test)
 //                     Wasserstand wird zeitgesteuert simuliert:
-//                     Fuellen: LOW nach 60s, HIGH nach 90s
-//                     Abpumpen: Leer nach 30s
+//                     Fuellen: LOW nach 10s, HIGH nach 20s
+//                     Abpumpen: Leer nach 20s
 //
 #define WATER_LEVEL_MODE      2
 

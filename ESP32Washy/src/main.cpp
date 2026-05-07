@@ -269,7 +269,15 @@ void setupWebserver() {
         doc["water_mode_name"] = waterLevel.getModeName();
         doc["door_locked"]   = nano.isDoorLocked();
         doc["nano_ok"]       = nano.isConnected();
+        doc["nano_state"]    = ns.state;
         doc["nano_error"]    = ns.error;
+        doc["nano_target_rpm"] = ns.targetRpm;
+        doc["nano_flags"]    = ns.flags;
+        doc["nano_control_request"] = ns.controlRequest;
+        doc["nano_output_state"] = ns.outputState;
+        doc["nano_last_read_ms"] = (ns.lastReadMs > 0) ? (uint32_t)(millis() - ns.lastReadMs) : 0;
+        doc["nano_last_write_ms"] = (uint32_t)nano.lastWriteAge();
+        doc["nano_i2c_errors"] = nano.getConsecutiveErrors();
         doc["selected_prog"] = selectedProgramIdx;
         doc["integration_mode"] = integration.current().mode == INTEGRATION_MODE_ESPHOME_API ? "esphome_api" : "mqtt";
         doc["mqtt_configured"] = mqttConfigured;
@@ -382,7 +390,7 @@ void setupWebserver() {
         if (programs.addCustomProgram(p)) {
             webserver.send(200, "application/json", "{\"ok\":true}");
         } else {
-            webserver.send(400, "application/json", "{\"ok\":false,\"error\":\"Hinzufuegen fehlgeschlagen\"}");
+            webserver.send(400, "application/json", "{\"ok\":false,\"error\":\"Hinzufügen fehlgeschlagen\"}");
         }
     });
 
@@ -490,36 +498,40 @@ select:focus,input:focus{outline:none;border-color:#38bdf8}
 .chk{width:auto;margin-right:6px}
 .nano-info{font-size:.75em;color:#64748b;margin-top:8px}
 .hint{font-size:.8em;color:#94a3b8;margin-top:6px;line-height:1.4}
+.divider{height:1px;background:#334155;margin:10px 0}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#334155;color:#cbd5e1;font-size:.75em;margin:2px 4px 0 0}
 </style></head><body>
 <h1>MyGenWashy</h1>
 
 <div class='card'>
+<div class='tabs'>
+<button class='tab active' onclick='showTab(0)'>Dashboard</button>
+<button class='tab' onclick='showTab(1)'>Programme</button>
+<button class='tab' onclick='showTab(2)'>Diagnose</button>
+<button class='tab' onclick='showTab(3)'>Integration</button>
+</div>
+
+<div id='tab0' class='panel active'>
 <h2>Status</h2>
 <div id='st' class='status'>--</div>
 <div id='pn' class='prog-name'></div>
 <div class='progress'><div id='pb' class='pbar' style='width:0%'></div></div>
 <div id='prog' style='font-size:.85em;color:#94a3b8'>0%</div>
 <div id='err' class='err' style='display:none'></div>
+<div class='grid' style='margin-top:10px'>
+  <div><div id='temp' class='val'>--</div><div class='label'>Temperatur Ist</div></div>
+  <div><div id='rpm' class='val'>--</div><div class='label'>Drehzahl Ist</div></div>
+  <div><div id='target_temp' class='val'>--</div><div class='label'>Temperatur Soll</div></div>
+  <div><div id='target_rpm' class='val'>--</div><div class='label'>Drehzahl Soll</div></div>
+  <div><div id='wl' class='val'>--</div><div class='label'>Wasserstand</div></div>
+  <div><div id='nano' class='val'>--</div><div class='label'>Nano Status</div></div>
 </div>
-
-<div class='card grid'>
-<div><div id='temp' class='val'>--</div><div class='label'>Temperatur</div></div>
-<div><div id='rpm' class='val'>--</div><div class='label'>Drehzahl</div></div>
-<div><div id='wl' class='val'>--</div><div class='label'>Wasserstand</div></div>
-<div><div id='nano' class='val'>--</div><div class='label'>Controller</div></div>
+<div class='divider'></div>
+<div class='grid'>
+  <div><div id='motion' class='val' style='font-size:1em'>--</div><div class='label'>Waschbewegung</div></div>
+  <div><div id='door' class='val' style='font-size:1em'>--</div><div class='label'>Tuerverriegelung</div></div>
 </div>
-
-<div class='card'>
-<div class='tabs'>
-<button class='tab active' onclick='showTab(0)'>Programm</button>
-<button class='tab' onclick='showTab(1)'>Neu erstellen</button>
-<button class='tab' onclick='showTab(2)'>Integration</button>
-</div>
-
-<div id='tab0' class='panel active'>
-<h2>Programm waehlen</h2>
-<select id='psel' onchange='selProg(this.value)'></select>
-<div id='pdet' class='prog-detail'></div>
 <div style='text-align:center;margin-top:8px'>
 <button class='btn btn-start' onclick='cmd("start")'>Start</button>
 <button class='btn btn-pause' onclick='cmd("pause")'>Pause</button>
@@ -529,8 +541,13 @@ select:focus,input:focus{outline:none;border-color:#38bdf8}
 </div>
 
 <div id='tab1' class='panel'>
+<h2>Programm wählen</h2>
+<select id='psel' onchange='selProg(this.value)'></select>
+<div id='pdet' class='prog-detail'></div>
+<div class='hint'>Vorhandene Programme ausw&auml;hlen oder darunter ein neues Profil anlegen.</div>
+<div class='divider'></div>
 <h2>Eigenes Programm</h2>
-<div class='form-row'><label>Name</label><input id='cp_name' maxlength='23' placeholder='z.B. Feinwaesche 30'></div>
+<div class='form-row'><label>Name</label><input id='cp_name' maxlength='23' placeholder='z.B. Feinwäsche 30'></div>
 <div class='grid'>
 <div class='form-row'><label>Temperatur (C)</label><input id='cp_temp' type='number' min='0' max='95' value='40'></div>
 <div class='form-row'><label>Wasch-RPM</label><input id='cp_wrpm' type='number' min='20' max='120' value='55'></div>
@@ -548,13 +565,36 @@ select:focus,input:focus{outline:none;border-color:#38bdf8}
 </div>
 <div class='form-row'><label><input type='checkbox' id='cp_pre' class='chk'>Vorwaesche</label></div>
 <div class='form-row'><label><input type='checkbox' id='cp_rinse' class='chk'>Extra-Spuelgang</label></div>
-<div class='hint'>Reale Waschbewegung wird hier als Lauf/Pause-Rhythmus abgebildet. Ein echter Richtungswechsel ist mit der aktuellen Hardware noch nicht verfuegbar.</div>
+<div class='hint'>Reale Waschbewegung wird hier als Lauf/Pause-Rhythmus abgebildet. Ein echter Richtungswechsel ist mit der aktuellen Hardware noch nicht verfügbar.</div>
 <div style='text-align:center;margin-top:8px'>
 <button class='btn' style='background:#2563eb' onclick='addProg()'>Speichern</button>
 </div>
 </div>
 
 <div id='tab2' class='panel'>
+<h2>Diagnose</h2>
+<div class='grid'>
+  <div><div id='diag_nano_state' class='val' style='font-size:1em'>--</div><div class='label'>Nano Zustand</div></div>
+  <div><div id='diag_nano_error' class='val' style='font-size:1em'>--</div><div class='label'>Nano Fehler</div></div>
+  <div><div id='diag_last_read' class='val' style='font-size:1em'>--</div><div class='label'>Letzter Read</div></div>
+  <div><div id='diag_last_write' class='val' style='font-size:1em'>--</div><div class='label'>Letzter Write</div></div>
+  <div><div id='diag_i2c_errors' class='val' style='font-size:1em'>--</div><div class='label'>I2C Fehlerfolge</div></div>
+  <div><div id='diag_water_mode' class='val' style='font-size:1em'>--</div><div class='label'>Water Mode</div></div>
+  <div><div id='diag_control' class='val mono' style='font-size:1em'>--</div><div class='label'>Control Request</div></div>
+  <div><div id='diag_outputs' class='val mono' style='font-size:1em'>--</div><div class='label'>Output State</div></div>
+  <div><div id='diag_flags' class='val mono' style='font-size:1em'>--</div><div class='label'>Flags</div></div>
+  <div><div id='diag_target_rpm' class='val' style='font-size:1em'>--</div><div class='label'>Nano Soll-RPM</div></div>
+</div>
+<div class='divider'></div>
+<div class='label'>Aktive Flags</div>
+<div id='diag_flag_labels' class='prog-detail'></div>
+<div class='label' style='margin-top:8px'>Aktive Anforderungen</div>
+<div id='diag_control_labels' class='prog-detail'></div>
+<div class='label' style='margin-top:8px'>Aktive Ausgänge</div>
+<div id='diag_output_labels' class='prog-detail'></div>
+</div>
+
+<div id='tab3' class='panel'>
 <h2>Home Assistant Anbindung</h2>
 <div class='form-row'>
   <label>Modus</label>
@@ -573,7 +613,7 @@ select:focus,input:focus{outline:none;border-color:#38bdf8}
 </div>
 <div style='text-align:center;margin-top:8px'>
   <button class='btn' style='background:#2563eb' onclick='saveIntegration()'>Integration speichern</button>
-</div>
+  </div>
 <div class='hint' id='integration_hint'>
   MQTT kann hier direkt konfiguriert werden. Die ESPHome-API-Alternative deaktiviert MQTT in dieser Firmware.
 </div>
@@ -594,6 +634,34 @@ var motionDefaults={
 function showTab(n){
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i==n));
   document.querySelectorAll('.panel').forEach((p,i)=>p.classList.toggle('active',i==n));
+}
+function nanoStateName(v){
+  v=Number(v||0);
+  if(v===0)return 'IDLE';
+  if(v===1)return 'ACTIVE';
+  if(v===2)return 'ERROR';
+  return 'Unbekannt ('+v+')';
+}
+function nanoErrorName(v){
+  v=Number(v||0);
+  if(v===0)return 'Kein Fehler';
+  if(v===1)return 'Overheat';
+  if(v===2)return 'Sensorfehler';
+  if(v===3)return 'Overspeed';
+  if(v===4)return 'ESP Timeout';
+  if(v===5)return 'Zero Cross fehlt';
+  if(v===6)return 'Motor Stall';
+  if(v===7)return 'Watchdog Reset';
+  return 'Code '+v;
+}
+function hex8(v){
+  return '0x'+(Number(v||0)&0xFF).toString(16).toUpperCase().padStart(2,'0');
+}
+function bitLabels(v, defs){
+  v=Number(v||0);
+  var out=[];
+  defs.forEach(function(d){ if((v & d[0]) !== 0) out.push(d[1]); });
+  return out.length?out.map(function(t){return '<span class="pill">'+t+'</span>';}).join(' '):'<span class="pill">keine</span>';
 }
 function applyMotionPreset(){
   var mode=parseInt(document.getElementById('cp_wmode').value||'0');
@@ -675,9 +743,9 @@ function showDetail(idx){
   if(p.smin>0){
     h+=' | Schleudern: '+p.srpm+' RPM x '+p.smin+' min';
   }
-  if(p.pre)h+=' | Vorwaesche';
-  if(p.rinse)h+=' | Extra-Spuelung';
-  if(p.custom)h+='<br><button class="del-btn" onclick="delProg('+p.idx+')">Loeschen</button>';
+  if(p.pre)h+=' | Vorwäsche';
+  if(p.rinse)h+=' | Extra-Spülung';
+  if(p.custom)h+='<br><button class="del-btn" onclick="delProg('+p.idx+')">Löschen</button>';
   document.getElementById('pdet').innerHTML=h;
 }
 function selProg(v){
@@ -700,12 +768,12 @@ function addProg(){
   if(!b.name){alert('Bitte Name eingeben');return;}
   fetch('/api/programs/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
   .then(r=>r.json()).then(d=>{
-    if(d.ok){document.getElementById('cp_name').value='';loadProgs();showTab(0);}
+    if(d.ok){document.getElementById('cp_name').value='';loadProgs();showTab(1);}
     else alert('Fehler: '+(d.error||'unbekannt'));
   });
 }
 function delProg(idx){
-  if(!confirm('Programm loeschen?'))return;
+  if(!confirm('Programm löschen?'))return;
   fetch('/api/programs/delete',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'idx='+idx})
   .then(()=>loadProgs());
 }
@@ -716,15 +784,39 @@ function upd(){fetch('/api/status').then(r=>r.json()).then(d=>{
   document.getElementById('prog').textContent=d.progress+'% — '+d.elapsed_min+' min';
   document.getElementById('temp').textContent=d.temperature+' °C';
   document.getElementById('rpm').textContent=d.rpm+' RPM';
+  document.getElementById('target_temp').textContent=(d.target_temp||0)+' °C';
+  document.getElementById('target_rpm').textContent=(d.nano_target_rpm||0)+' RPM';
+  document.getElementById('motion').textContent=(d.wash_motion_name||'-')+' ('+(d.wash_run_sec||0)+'s/'+(d.wash_pause_sec||0)+'s)';
   var wl=(d.water_low?'LOW ':'')+(d.water_high?'HIGH':'');
   document.getElementById('wl').textContent=wl||'Leer';
   document.getElementById('nano').innerHTML=d.nano_ok?
     '<span class="ok">OK</span>':'<span class="warn">Getrennt</span>';
+  document.getElementById('door').textContent=d.door_locked?'Verriegelt':'Offen/Frei';
   var ee=document.getElementById('err');
   if(d.wash_error&&d.wash_error!='Kein Fehler'){ee.textContent=d.wash_error;ee.style.display='block';}
   else{ee.style.display='none';}
+  document.getElementById('diag_nano_state').textContent=nanoStateName(d.nano_state);
+  document.getElementById('diag_nano_error').textContent=nanoErrorName(d.nano_error);
+  document.getElementById('diag_last_read').textContent=(d.nano_last_read_ms||0)+' ms';
+  document.getElementById('diag_last_write').textContent=(d.nano_last_write_ms||0)+' ms';
+  document.getElementById('diag_i2c_errors').textContent=String(d.nano_i2c_errors||0);
+  document.getElementById('diag_water_mode').textContent=d.water_mode_name||'-';
+  document.getElementById('diag_control').textContent=hex8(d.nano_control_request);
+  document.getElementById('diag_outputs').textContent=hex8(d.nano_output_state);
+  document.getElementById('diag_flags').textContent=hex8(d.nano_flags);
+  document.getElementById('diag_target_rpm').textContent=(d.nano_target_rpm||0)+' RPM';
+  document.getElementById('diag_flag_labels').innerHTML=bitLabels(d.nano_flags,[
+    [0x01,'Door locked'],[0x02,'Heater'],[0x04,'Pump'],[0x08,'Motor power'],
+    [0x10,'Water inlet'],[0x20,'ESP connected'],[0x40,'Error'],[0x80,'Active']
+  ]);
+  document.getElementById('diag_control_labels').innerHTML=bitLabels(d.nano_control_request,[
+    [0x01,'Lock'],[0x02,'Drain'],[0x04,'Water 1'],[0x08,'Water 2'],[0x10,'Heater'],[0x20,'Motor enable']
+  ]);
+  document.getElementById('diag_output_labels').innerHTML=bitLabels(d.nano_output_state,[
+    [0x01,'Lock'],[0x02,'Drain'],[0x04,'Water 1'],[0x08,'Water 2'],[0x10,'Heater'],[0x20,'Motor enable']
+  ]);
   document.getElementById('nanoinfo').textContent=
-    'WiFi: '+d.wifi_rssi+' dBm | Uptime: '+Math.floor(d.uptime_sec/60)+' min | Nano-Fehler: '+d.nano_error+
+    'WiFi: '+d.wifi_rssi+' dBm | Uptime: '+Math.floor(d.uptime_sec/60)+' min | Nano-Fehler: '+nanoErrorName(d.nano_error)+
     ' | Integration: '+(d.integration_mode||'mqtt')+' | MQTT: '+(d.mqtt_connected?'verbunden':'aus/getrennt');
 }).catch(()=>{})}
 document.getElementById('int_mode').addEventListener('change',updateIntegrationUi);
@@ -750,7 +842,7 @@ void setupMqtt() {
     mqttDiscoverySent = false;
 
     if (!integrationUsesMqtt()) {
-        Serial.println(F("Integration: ESPHome API Alternative gewaehlt, MQTT deaktiviert"));
+        Serial.println(F("Integration: ESPHome API Alternative gewählt, MQTT deaktiviert"));
         return;
     }
 
@@ -865,7 +957,7 @@ void _publishDiscovery(const char* component, const char* id, JsonDocument& doc)
     JsonObject dev = doc["dev"].to<JsonObject>();
     dev["ids"][0]  = "mygenwashy";
     dev["name"]    = "MyGenWashy";
-    dev["mdl"]     = "MyGenWashy v2";
+    dev["mdl"]     = "MyGenWashy v2 von Daniel, Max, Kevin";
     dev["sw"]      = "2.0";
 
     String topic = mqttDiscoveryTopic(component, id);
@@ -913,7 +1005,7 @@ void publishMqttDiscovery() {
 
     // --- Binary Sensors ---
     {
-        JsonDocument d; d["name"]="Tuer verriegelt"; d["uniq_id"]="mgw_door";
+        JsonDocument d; d["name"]="Tür verriegelt"; d["uniq_id"]="mgw_door";
         d["stat_t"]=mqttTopic("binary_sensor/door/state");
         d["dev_cla"]="lock"; d["ic"]="mdi:door-closed-lock";
         _publishDiscovery("binary_sensor","door",d);
